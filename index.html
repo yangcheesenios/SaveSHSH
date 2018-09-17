@@ -1,150 +1,4 @@
-<?php
-	/*
-	* TSS Saver
-	* Author: 1Conan
-	* License: MIT
-	*/
-	
-	require_once 'inc/medoo.php';
-	require_once 'inc/config.php';
-	require_once 'inc/functions.php';
-	
-	
-	
-	if(isset($_POST['submit'])) {
-		if($reCaptcha['enabled'] == true) {
-			if (!isset($_POST['g-recaptcha-response'])) {
-				err("Captcha Error!");
-			}
-			
-			$response = file_get_contents("https://www.google.com/recaptcha/api/siteverify?secret=".$reCaptcha['privateKey']."&response=".$_POST['g-recaptcha-response']."&remoteip=".$_SERVER['REMOTE_ADDR']);
-			$response2 = json_decode($response, true);
-			
-			if($response2['success'] == false){
-				err("Captcha Error!");
-			}
-		}
-		if($_POST['ECIDType'] == 0) {
-			if(ctype_xdigit($_POST['ECID']) && is_numeric(hexdec($_POST['ECID']))) {
-				$deviceECID = hexdec($_POST['ECID']);
-			} else {
-				err("Invalid ECID! (HEX)");
-			}
-		} else if($_POST['ECIDType'] == 1) {
-			if(is_numeric($_POST['ECID'])) {
-				$deviceECID = $_POST['ECID'];
-			} else {
-				err("Invalid ECID! (DEC)");
-			}
-		}
-		
-		if($_POST['deviceType'] == "iPhone") {
-			$deviceType = "iPhone";
-		} else if($_POST['deviceType'] == "iPod") {
-			$deviceType = "iPod";
-		} else if($_POST['deviceType'] == "iPad") {
-			$deviceType = "iPad";
-		} else if($_POST['deviceType'] == "AppleTV") {
-			$deviceType = "AppleTV";
-		} else {
-            err("Invalid Device Type!");
-        }
-        $deviceModelList = json_decode(file_get_contents('json/deviceModels.json'), true);
-        
-        $deviceIdentifier = $deviceModelList[$deviceType][$_POST['deviceModel']];
 
-		$deviceInfo = array(
-				'deviceIdentifier' => $deviceIdentifier,
-				'deviceType' => $deviceType,
-				'deviceID' => str_replace($deviceType, "", $deviceIdentifier),
-				'deviceECID' => $deviceECID
-			);
-		$deviceList = json_decode(file_get_contents('json/devices.json'), true);
-		if(!in_array($deviceInfo['deviceIdentifier'], $deviceList)){
-			err("Device Identifier not recognized! ".$deviceIdentifier);
-		}
-		
-		
-		
-		$database = new medoo([
-				'database_type' => 'mysql',
-				'database_name' => $db['name'],
-				'server' => $db['server'],
-				'username' => $db['user'],
-				'password' => $db['password'],
-				'charset' => 'utf8'
-			]);
-		$result = $database->select($db['table'], 'deviceECID', [
-				'deviceECID' => $deviceECID
-			]);
-		
-		$url = $savedSHSHURL.$deviceECID;
-		
-		if(count($result) > 0) {
-			saveBlobs($deviceInfo, $apnonce, $signedVersionsURL);
-			
-			die("<center>Device identifier already added! (Force download starting.) <br><a href='".$url."'>".$url."</a></center>");
-		}
-		
-		if (!file_exists('shsh/'.$deviceECID)) {
-			mkdir('shsh/'.$deviceECID, 0777, true);
-		}
-		
-		$database->insert($db['table'], $deviceInfo);
-		
-		saveBlobs($deviceInfo, $apnonce, $signedVersionsURL);
-		
-		exit("<center>Done saving ECID!<br>SHSH blobs will be saved in <a href='".$url."'>".$url."</a></center>");
-	}
-	
-	if(isset($_POST['delete'])) {
-		if($reCaptcha['enabled'] == true) {
-			if (!isset($_POST['g-recaptcha-response'])) {
-				err("Captcha Error!");
-			}
-			
-			$response = file_get_contents("https://www.google.com/recaptcha/api/siteverify?secret=".$reCaptcha['privateKey']."&response=".$_POST['g-recaptcha-response']."&remoteip=".$_SERVER['REMOTE_ADDR']);
-			$response2 = json_decode($response, true);
-			
-			if($response2['success'] == false){
-				err("Captcha Error!");
-			}
-		}
-		if($_POST['ECIDType'] == 0) {
-			if(ctype_xdigit($_POST['ECID']) && is_numeric(hexdec($_POST['ECID']))) {
-				$deviceECID = hexdec($_POST['ECID']);
-			} else {
-				err("Invalid ECID! (HEX)");
-			}
-		} else if($_POST['ECIDType'] == 1) {
-			if(is_numeric($_POST['ECID'])) {
-				$deviceECID = $_POST['ECID'];
-			} else {
-				err("Invalid ECID! (DEC)");
-			}
-		}
-		$database = new medoo([
-				'database_type' => 'mysql',
-				'database_name' => $db['name'],
-				'server' => $db['server'],
-				'username' => $db['user'],
-				'password' => $db['password'],
-				'charset' => 'utf8'
-			]);
-		
-		$result = $database->select($db['table'], 'deviceECID', [
-				'deviceECID' => $deviceECID
-			]);
-		if(count($result) == 0) {
-			err("<center>ECID Not found!</center>");
-		}
-		$database->delete($db['table'], [
-				"AND" => [
-					"deviceECID" => $deviceECID
-				]
-			]);
-		err('Sucessfully deleted ECID!');
-	}
 ?>
 <!DOCTYPE html>
 <html>
@@ -157,14 +11,9 @@
 	<body>
 		<div class="box">
 			<h1 class="title"><span style="font-weight:600;">TSS Saver</span> - SHSH2 Blobs Saver</h1>
-			<p class="author">by <a href="https://www.reddit.com/user/1Conan/">/u/1Conan</a></p>
-			<p class="author">Theme by <a href="https://www.reddit.com/user/MareddySaiKiran">/u/MareddySaiKiran</a></p>
+			<p class="author">by <a href="">Yangcheesen</a></p>
+			<p class="author">Theme by <a href="">Zlab Team</a></p>
 			</div>
-		<div class="box">
-			<h1 class="note">Note : </h1>
-			<p>&#8226; Reddit thread + tutorial: <a href="https://redd.it/5ivapw" target="_blank">Click Here</a></p>
-			<p>&#8226; Verify blobs here: <a href="check.php" target="_blank">Click Here</a></p>
-		</div>
 		<div class="box">
 			<form method="post" action="<?php echo htmlspecialchars($_SERVER['PHP_SELF']);?>">
 			<h1 class="note">ECID : </h1>
@@ -242,9 +91,7 @@
 				<input class="button" type="submit" name="delete" value="Delete ECID!" style="width:100%">
 			</form>
 		</div>
-		<p style="text-align:center;">Copyright &copy; 1Conan, 2016</p>
-		<p style="text-align:center;"><a href="https://github.com/1Conan/TSSSaver">TSS Savver</a> is licensed under <a href="LICENSE">MIT License</a></p>
-		<script>
+		<p style="text-align:center;">Copyright &copy; SaveSHSH, 2018</p>
 				var serverURL = "<?php echo $serverURL; ?>";
 				function getJSON(url) {
 					var request = new XMLHttpRequest(),
@@ -290,26 +137,8 @@
 					
 				}
 		</script>
-		<?php 
-			if($reCaptcha['enabled'] == true) {
-				?>
-					<script src="https://www.google.com/recaptcha/api.js?onload=myCallBack&render=explicit" defer></script>
-					<script>
-						var recaptcha1;
-						var recaptcha2;
-						var myCallBack = function() {
-							recaptcha1 = grecaptcha.render('recaptcha1', {
-								'sitekey' : '<?php echo $reCaptcha['publicKey']; ?>',
-								'theme' : 'light'
-							});
-							recaptcha2 = grecaptcha.render('recaptcha2', {
-								'sitekey' : '<?php echo $reCaptcha['publicKey']; ?>',
-								'theme' : 'light'
-							});
-						};
-					</script>
-				<?php
-			}
+		
+
 		?>
 	</body>
 </html>
